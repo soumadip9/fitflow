@@ -1,4 +1,5 @@
 {
+  "installCommand": "npm install --no-package-lock",
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
   "rewrites": [
