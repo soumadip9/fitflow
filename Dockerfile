@@ -1,13 +1,17 @@
-FROM node:20
+FROM node:18
 
 WORKDIR /app
 
-COPY . .
+COPY package*.json ./
 
-RUN npm install --no-package-lock
+RUN npm install
+
+COPY . .
 
 RUN npm run build
 
-EXPOSE 5173
+RUN npm install -g serve
 
-CMD ["npm", "run", "dev"]
+EXPOSE 3000
+
+CMD ["serve", "-s", "dist", "-l", "3000"]
