@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // Matches the ID of the credentials we will add in Jenkins
+        // Matches the ID of the credentials we added in Jenkins
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-token')
         DOCKER_IMAGE = "soumadipghosh/fitflow"
     }
@@ -19,8 +19,8 @@ pipeline {
             steps {
                 script {
                     echo "Building Docker Image..."
-                    // Uses the Dockerfile already in your repo
-                    sh "docker build -t ${DOCKER_IMAGE}:latest ."
+                    // Uses 'bat' instead of 'sh' for Windows Jenkins
+                    bat "docker build -t ${DOCKER_IMAGE}:latest ."
                 }
             }
         }
@@ -29,10 +29,10 @@ pipeline {
             steps {
                 script {
                     echo "Logging into Docker Hub..."
-                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                    bat "echo %DOCKERHUB_CREDENTIALS_PSW% | docker login -u %DOCKERHUB_CREDENTIALS_USR% --password-stdin"
                     
                     echo "Pushing Image to Docker Hub..."
-                    sh "docker push ${DOCKER_IMAGE}:latest"
+                    bat "docker push ${DOCKER_IMAGE}:latest"
                 }
             }
         }
