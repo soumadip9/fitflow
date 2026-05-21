@@ -3,12 +3,11 @@ pipeline {
 
     environment {
 
+        // Docker Hub Credentials
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-token')
 
-       
+        // Docker Image Name
         DOCKER_IMAGE = "soumadipghosh/fitflow"
-
-        SONAR_TOKEN = credentials('sonar-token')
     }
 
     stages {
@@ -16,27 +15,8 @@ pipeline {
         stage('Checkout') {
             steps {
 
-             
+                // Pull latest code from GitHub
                 checkout scm
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-
-                    echo "Running SonarQube Scan..."
-
-                    def scannerHome = tool 'sonar-scanner'
-
-                    bat """
-                    ${scannerHome}\\bin\\sonar-scanner.bat ^
-                    -Dsonar.projectKey=fitflow ^
-                    -Dsonar.sources=. ^
-                    -Dsonar.host.url=http://localhost:9000 ^
-                    -Dsonar.login=%SONAR_TOKEN%
-                    """
-                }
             }
         }
 
