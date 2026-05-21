@@ -29,8 +29,11 @@ pipeline {
 
                     echo "Running SonarQube Scan..."
 
+                    // Get SonarScanner path from Jenkins tools
+                    def scannerHome = tool 'sonar-scanner'
+
                     bat """
-                    sonar-scanner ^
+                    ${scannerHome}\\bin\\sonar-scanner.bat ^
                     -Dsonar.projectKey=fitflow ^
                     -Dsonar.sources=. ^
                     -Dsonar.host.url=http://localhost:9000 ^
