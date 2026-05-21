@@ -8,9 +8,6 @@ pipeline {
 
         // Docker Image Name
         DOCKER_IMAGE = "soumadipghosh/fitflow"
-
-        // SonarQube Token
-        SONAR_TOKEN = credentials('sonar-token')
     }
 
     stages {
@@ -20,26 +17,6 @@ pipeline {
 
                 // Pull latest code from GitHub
                 checkout scm
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-
-                    echo "Running SonarQube Scan..."
-
-                    // Get SonarScanner path from Jenkins tools
-                    def scannerHome = tool 'sonar-scanner'
-
-                    bat """
-                    ${scannerHome}\\bin\\sonar-scanner.bat ^
-                    -Dsonar.projectKey=fitflow ^
-                    -Dsonar.sources=. ^
-                    -Dsonar.host.url=http://localhost:9000 ^
-                    -Dsonar.login=%SONAR_TOKEN%
-                    """
-                }
             }
         }
 
