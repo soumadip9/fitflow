@@ -307,7 +307,6 @@ FitFlow combines:
 
 to build an **explainable, personalized fashion recommendation system**.
 
-TESTING JENKINS
 
 
 ---
