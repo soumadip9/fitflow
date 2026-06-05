@@ -1,0 +1,35 @@
+# Render Blueprint — backend API (Python/FastAPI)
+# Connect repo: https://github.com/soumadip9/fitflow
+# Dashboard: New > Blueprint > connect this repo, or New Web Service with rootDir=backend
+
+services:
+  - type: web
+    name: fitflow-api
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: fitflow
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SERPAPI_API_KEY
+        sync: false
+      - key: REMOVEBG_API_KEY
+        sync: false
