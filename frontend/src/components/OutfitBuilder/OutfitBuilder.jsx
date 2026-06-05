@@ -240,7 +240,7 @@ function OutfitBuilder() {
     };
 
     const BUILD_OUTFIT_MS = 14000;
-    const RATE_OUTFIT_MS = 45000;
+    const RATE_OUTFIT_MS = 60000;
 
     const handleGenerateSuggestion = async () => {
         setIsGenerating(true);
@@ -381,8 +381,15 @@ function OutfitBuilder() {
 
         setIsRating(true);
         setFeedbackError('');
-        try {
-            const profileGender = getProfileGender();
+
+        const profileGender = getProfileGender();
+        const requestBody = JSON.stringify({
+            occasion,
+            outfit: outfitPayload,
+            ...(profileGender ? { gender: profileGender } : {}),
+        });
+
+        const attemptRate = async () => {
             const res = await fetchWithTimeout(
                 `${API_BASE}/rate-outfit`,
                 {
@@ -391,23 +398,31 @@ function OutfitBuilder() {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        occasion,
-                        outfit: outfitPayload,
-                        ...(profileGender ? { gender: profileGender } : {}),
-                    }),
+                    body: requestBody,
                 },
                 RATE_OUTFIT_MS
             );
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Failed to rate outfit');
+            return data;
+        };
+
+        try {
+            let data;
+            try {
+                data = await attemptRate();
+            } catch (firstErr) {
+                // One automatic retry for transient network/timeout blips before surfacing an error.
+                console.warn('Rate outfit attempt failed, retrying once', firstErr);
+                data = await attemptRate();
+            }
             setFeedback(data);
         } catch (err) {
             console.error('Failed to rate outfit', err);
             setFeedbackError(
                 err?.name === 'AbortError'
-                    ? 'Feedback timed out — try again or check your connection.'
-                    : 'Could not fetch feedback right now.'
+                    ? 'Feedback is taking longer than usual — please try again in a moment.'
+                    : 'Could not fetch feedback right now. Please try again.'
             );
         } finally {
             setIsRating(false);
@@ -728,7 +743,21 @@ function OutfitBuilder() {
 
                                     {feedback.why_it_works && (
                                         <div className="feedback-card__why">
-                                            <strong>Why This Works</strong>
+                                            <strong
+                                                style={{
+                                                    color: feedback.rating >= 7
+                                                        ? '#22c55e'
+                                                        : feedback.rating >= 5
+                                                            ? '#f59e0b'
+                                                            : '#ef4444',
+                                                }}
+                                            >
+                                                {feedback.rating >= 7
+                                                    ? 'Why This Works'
+                                                    : feedback.rating >= 5
+                                                        ? 'The Verdict'
+                                                        : "What's Holding It Back"}
+                                            </strong>
                                             <p>{feedback.why_it_works}</p>
                                         </div>
                                     )}

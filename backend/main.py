@@ -41,6 +41,37 @@ app.add_middleware(
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+@app.get("/health")
+def health():
+    """Lightweight liveness probe — hit this from an uptime pinger (e.g. UptimeRobot)
+    every ~10 min so Render's free tier never spins down and cold starts disappear."""
+    return {"status": "ok"}
+
+
+@app.on_event("startup")
+def _warm_up():
+    """Pre-open the Mongo connection and load the YOLO model in the background so
+    the first real login / wardrobe upload doesn't pay that one-time cost.
+    Runs in a daemon thread so it never delays the server from accepting requests."""
+    import threading
+
+    def _warm():
+        try:
+            from db import client as _mongo
+            _mongo.admin.command("ping")
+            print("✅ Mongo connection warmed")
+        except Exception as e:
+            print(f"⚠️  Mongo warm-up skipped: {e}")
+        try:
+            from ml.detect import get_model
+            get_model()
+            print("✅ YOLO model warmed")
+        except Exception as e:
+            print(f"⚠️  Model warm-up skipped: {e}")
+
+    threading.Thread(target=_warm, daemon=True).start()
+
 # Outfit preview: skip remove.bg if image already has alpha; reject API output if still effectively opaque.
 _RGBA_ALPHA_CUTOFF = 250
 _ALREADY_TRANSPARENT_MIN_RATIO = 0.012

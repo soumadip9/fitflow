@@ -189,6 +189,8 @@ def _occasion_score(occ: str, ct: str, cb: str, cs: str) -> Tuple[int, List[str]
             pts = 45
         elif ct in ("formal_shirt", "longsleeve") and cb == "jeans":
             pts = 30
+        elif ct in ("longsleeve", "cardigan", "sweaters", "pullover", "vest", "top") and cb == "trousers":
+            pts = 35  # smart-casual office: collared/knit top with trousers
         elif ct == "t-shirt" and cb == "jeans":
             pts = 20
         elif ct in TOPS and cb in BOTTOMS:

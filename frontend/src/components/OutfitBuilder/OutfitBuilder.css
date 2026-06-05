@@ -982,16 +982,34 @@
     width: fit-content;
 }
 
-/* Feedback body text */
+/* Feedback body text — "Stylist's Take" summary panel */
 .feedback-card__text {
+    position: relative;
     font-size: 0.95rem;
     color: var(--text-primary);
-    opacity: 0.9;
     line-height: 1.7;
     margin-bottom: 24px;
-    padding-left: 16px;
-    border-left: 3px solid var(--border-color);
+    padding: 16px 20px;
+    background:
+        linear-gradient(135deg, var(--accent-soft) 0%, transparent 70%),
+        var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent);
+    border-radius: 12px;
     letter-spacing: 0.01em;
+}
+
+.feedback-card__text::before {
+    content: "Stylist's Take";
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-text);
+    margin-bottom: 10px;
 }
 
 /* Breakdown / Why This Works */

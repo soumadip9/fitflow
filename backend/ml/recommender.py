@@ -15,7 +15,10 @@ try:
     from groq import Groq as _GroqClient
     _GROQ_KEY = os.getenv("GROQ_API_KEY", "").strip()
     if _GROQ_KEY:
-        _groq_client = _GroqClient(api_key=_GROQ_KEY)
+        # Bound latency: a throttled call should fail fast and fall back to the
+        # rule-based engine instead of hanging on the SDK's default retry/backoff
+        # (which can add 30-60s and blow past the client's request timeout).
+        _groq_client = _GroqClient(api_key=_GROQ_KEY, timeout=18.0, max_retries=1)
         print("✅ Groq AI feedback: ENABLED (llama-3.3-70b-versatile)")
     else:
         _groq_client = None
@@ -267,31 +270,58 @@ def _generate_why_it_works(
     bottom_name: str,
     shoes_name: str,
     colors: str,
+    rating_10: float = 0.0,
+    issues: Optional[List[str]] = None,
     gender: Optional[str] = None,
     wardrobe: Optional[List[Dict]] = None,
 ) -> Optional[str]:
     """
-    ✨ Prompt 2: "Why This Outfit Works" explainability.
+    ✨ Prompt 2: outfit verdict explainability.
+    The explanation MUST stay consistent with the rating — a low score should
+    explain what holds the outfit back, not praise it.
     Returns a short paragraph or None.
     """
     gender_note = f"The wearer identifies as {gender}." if gender else ""
+    issues_block = (
+        "\n".join(f"- {i}" for i in issues if str(i or '').strip())
+        if issues else "- (none flagged)"
+    )
+
+    if rating_10 < 5:
+        tone = (
+            "This score is LOW. Explain honestly WHY this outfit falls short for the "
+            "occasion (e.g. wrong formality, inappropriate footwear, clashing or too-casual "
+            "pieces). Do NOT call it a good or suitable choice. Do NOT end on praise."
+        )
+    elif rating_10 < 7:
+        tone = (
+            "This score is MODERATE. Give a balanced verdict: briefly note what works, then "
+            "clearly state what limits it for the occasion."
+        )
+    else:
+        tone = (
+            "This score is HIGH. Explain why this outfit works well for the occasion "
+            "(color harmony, style balance, occasion fit)."
+        )
+
     prompt = f"""You are a fashion expert. {gender_note}
 You know these clothing types: {_YOLO_CLASSES}.
 
-Explain why this outfit works (or doesn't):
-
+Outfit:
 Top: {top_name}
 Bottom: {bottom_name}
 Shoes: {shoes_name}
 Colors: {colors}
 Occasion: {occasion.replace('_', ' ')}
 
-Focus on:
-- Color harmony
-- Style balance
-- Occasion suitability
+Rating given: {rating_10}/10
+Flagged issues:
+{issues_block}
 
-Keep it short (3-4 lines max). No markdown, no bullet points.
+{tone}
+
+Your explanation MUST be consistent with the {rating_10}/10 rating and the flagged issues —
+never contradict them. Keep it short (2-3 lines max). No markdown, no bullet points.
 """
     return _call_groq(prompt, max_tokens=150)
 
@@ -611,14 +641,21 @@ def _strict_build_outfit(
             add("accessory", acc)
 
     elif occ == "office":
-        t = _pick_best(grouped["top"], {"formal_shirt", "longsleeve", "top"}, forb)
+        t = _pick_best(
+            grouped["top"],
+            {"formal_shirt", "longsleeve", "blazer", "cardigan", "vest", "sweaters", "pullover", "top"},
+            forb,
+        )
         b = _pick_best(grouped["bottom"], {"trousers"}, forb)
         sh = _pick_best(grouped["shoes"], {"boot", "heel"}, forb)
-        if not t or not b or not sh:
+        if not t or not b:
             return {"message": f"Not enough items for occasion '{occ}'", "missing_category": "required_set"}
         add("top", t)
         add("bottom", b)
-        add("shoes", sh)
+        # Shoes are optional: if no office-appropriate footwear exists, keep the
+        # valid top+bottom rather than discarding them for a casual fallback.
+        if sh:
+            add("shoes", sh)
 
     elif occ == "casual_day":
         t = _pick_best(grouped["top"], {"t-shirt", "hoodie", "sweatshirt", "casual"}, forb)
@@ -804,12 +841,21 @@ def _rank_strict_outfit_combos(
 
     elif occ == "office":
         tops = _sorted_pool(
-            grouped["top"], {"formal_shirt", "longsleeve", "top"}, forb, bl
+            grouped["top"],
+            {"formal_shirt", "longsleeve", "blazer", "cardigan", "vest", "sweaters", "pullover", "top"},
+            forb,
+            bl,
         )
         bottoms = _sorted_pool(grouped["bottom"], {"trousers"}, forb, bl)
         shoes = _sorted_pool(grouped["shoes"], {"boot", "heel"}, forb, bl)
-        for t, b, sh in product(tops, bottoms, shoes):
-            push({"top": t, "bottom": b, "shoes": sh})
+        for t, b in product(tops, bottoms):
+            # When the wardrobe has no office-appropriate footwear, still showcase
+            # the proper top+bottom instead of bailing to an unfiltered casual fallback.
+            if shoes:
+                for sh in shoes:
+                    push({"top": t, "bottom": b, "shoes": sh})
+            else:
+                push({"top": t, "bottom": b})
 
     elif occ == "casual_day":
         tops = _sorted_pool(
@@ -958,6 +1004,25 @@ def _rank_strict_outfit_combos(
     return out
 
 
+def _fill_missing_shoes(
+    outfit: Dict[str, Any], grouped_full: Dict[str, List[Dict[str, Any]]], occ: str
+) -> Dict[str, Any]:
+    """
+    If an outfit has no footwear but the wardrobe owns some, fill the slot with the
+    closest available shoe (best confidence, excluding only hard-forbidden classes)
+    rather than leaving footwear empty. Keeps the look complete while shopping
+    suggestions still nudge toward the ideal footwear.
+    """
+    if not isinstance(outfit, dict) or outfit.get("shoes"):
+        return outfit
+    from ml.occasion_rules import HARD_CONSTRAINTS
+    hard_forb = set(HARD_CONSTRAINTS.get(occ, set()))
+    shoe = _pick_best(grouped_full.get("shoes", []), None, hard_forb)
+    if shoe:
+        outfit["shoes"] = shoe
+    return outfit
+
+
 def build_outfit(
     occasion: str, wardrobe: List[Dict[str, Any]], gender: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -991,6 +1056,15 @@ def build_outfit(
 
     ranked = _rank_strict_outfit_combos(occ, grouped_strict, gender, max_options=5)
     if ranked:
+        # Complete any shoeless combos with the closest available footwear, then
+        # re-score so the preview rating reflects the actual (filled) outfit.
+        for opt in ranked:
+            _fill_missing_shoes(opt["outfit"], grouped_full, occ)
+            opt["scores"] = _confidence_scores(opt["outfit"])
+            rating2, sub2 = _combo_occasion_rating(occ, opt["outfit"], gender)
+            opt["preview_rating"] = rating2
+            opt["subscores"] = sub2
+        ranked.sort(key=lambda x: -float(x.get("preview_rating") or 0))
         primary = ranked[0]
         res = {
             "occasion": occ,
@@ -1004,6 +1078,7 @@ def build_outfit(
 
     strict_res = _strict_build_outfit(occ, grouped_strict, gender)
     if strict_res.get("outfit"):
+        _fill_missing_shoes(strict_res["outfit"], grouped_full, occ)
         strict_res["match_quality"] = "strict"
         return _check_min_score(strict_res)
 
@@ -1154,6 +1229,8 @@ def rate_outfit(
         bottom_name=bottom_name,
         shoes_name=shoes_name,
         colors=colors_summary,
+        rating_10=rating,
+        issues=issues,
         gender=gender,
         wardrobe=wardrobe,
     )

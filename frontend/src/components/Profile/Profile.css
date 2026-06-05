@@ -50,7 +50,7 @@
 }
 
 .btn-edit-ghost:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-hover);
     border-color: var(--text-primary);
 }
 
@@ -117,14 +117,14 @@
 
 .stat-card {
     flex: 1;
-    background: #1e1e1e;
+    background: var(--bg-card);
     padding: 20px;
     border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
 }
 
 .stat-value {
@@ -147,10 +147,10 @@
 
 /* Content Card */
 .profile-content-card {
-    background: #1e1e1e;
+    background: var(--bg-card);
     border-radius: 16px;
     padding: 32px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
     margin-bottom: 32px;
 }
 
@@ -190,13 +190,13 @@
 }
 
 .info-item {
-    background: #141414;
+    background: var(--bg-input);
     padding: 16px 20px;
     border-radius: 12px;
     display: flex;
     flex-direction: column;
     gap: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
 }
 
 .info-label {
@@ -223,7 +223,7 @@
 }
 
 .info-chip {
-    background: #141414;
+    background: var(--bg-input);
     padding: 10px 16px;
     border-radius: 20px;
     font-size: 0.85rem;
@@ -265,8 +265,8 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: #1e1e1e;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     color: var(--text-tertiary);
     display: flex;
     align-items: center;
@@ -276,7 +276,7 @@
 }
 
 .btn-down-arrow:hover {
-    background: #252525;
+    background: var(--bg-hover);
     color: var(--text-primary);
     transform: translateY(3px);
 }
@@ -294,8 +294,8 @@
     border-radius: 12px;
     font-size: 0.85rem;
     font-weight: 600;
-    background: #141414;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
     color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
@@ -333,8 +333,8 @@
 }
 
 .color-swatch--selected {
-    border-color: white;
-    box-shadow: 0 0 0 2px #1e1e1e, 0 0 0 4px #ff0055;
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px #ff0055;
 }
 
 /* Form Overrides */
@@ -344,8 +344,8 @@
 
 .edit-form-container .input,
 .edit-form-container .select {
-    background: #141414;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 12px 16px;
     border-radius: 10px;
@@ -389,12 +389,12 @@
 
 .btn--secondary {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--border-color-strong);
     color: var(--text-primary);
 }
 
 .btn--secondary:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-hover);
 }
 
 .save-toast {

@@ -15,9 +15,20 @@ load_dotenv(
 )
 
 # MongoDB Setup
+# Bounded timeouts + a connection pool so the first request after a cold start
+# fails fast (instead of hanging on pymongo's 30s default) and warm requests
+# reuse pooled sockets. retryWrites smooths over transient Atlas blips.
+_MONGO_KWARGS = dict(
+    serverSelectionTimeoutMS=8000,
+    connectTimeoutMS=8000,
+    socketTimeoutMS=20000,
+    maxPoolSize=20,
+    retryWrites=True,
+)
+
 MONGO_URI = os.getenv("MONGODB_URI")
 if MONGO_URI and "mongodb+srv" in MONGO_URI:
-    client = MongoClient(MONGO_URI)
+    client = MongoClient(MONGO_URI, **_MONGO_KWARGS)
     db_name = os.getenv("MONGODB_DB_NAME", "fitflow")
     db = client[db_name] # Uses the explicit database name
     users_collection = db["users"]

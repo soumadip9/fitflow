@@ -1,6 +1,7 @@
 import os
 import re
 import requests
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote_plus
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -522,6 +523,11 @@ def build_shopping_links(
 
     seen_queries: Set[str] = set()
 
+    # Collect unique, ordered queries first so the independent SerpAPI calls can
+    # run in parallel instead of sequentially (each call can take several seconds;
+    # serial fetches are the main cause of the rating request exceeding its timeout).
+    ordered_queries: List[str] = []
+
     for suggestion in suggestions or []:
         if suggestion is None:
             continue
@@ -530,16 +536,13 @@ def build_shopping_links(
             continue
 
         print("[shopping-debug] suggestion raw text:", repr(s))
-        if is_smart_query:
-            q = s
-        else:
-            q = clean_query(s, gender=gender)
+        q = s if is_smart_query else clean_query(s, gender=gender)
         print("[shopping-debug] 2. CLEANED QUERY:", repr(q))
 
-        products = get_products(q, limit=limit, gender=gender)
-        if products:
-            grouped.append({"query": q, "products": products})
-            seen_queries.add(q.lower())
+        ql = q.lower()
+        if q and ql not in seen_queries:
+            seen_queries.add(ql)
+            ordered_queries.append(q)
 
     for pq in preset_queries or []:
         pq = (pq or "").strip()
@@ -549,10 +552,20 @@ def build_shopping_links(
         if pl in seen_queries:
             continue
         print("[shopping-debug] gap preset query (direct):", repr(pq))
-        products = get_products(pq, limit=limit, gender=gender)
-        if products:
-            grouped.append({"query": pq, "products": products})
-            seen_queries.add(pl)
+        seen_queries.add(pl)
+        ordered_queries.append(pq)
+
+    if ordered_queries:
+        with ThreadPoolExecutor(max_workers=min(6, len(ordered_queries))) as pool:
+            results = list(
+                pool.map(
+                    lambda q: get_products(q, limit=limit, gender=gender),
+                    ordered_queries,
+                )
+            )
+        for q, products in zip(ordered_queries, results):
+            if products:
+                grouped.append({"query": q, "products": products})
 
     if not has_nonempty_suggestion and not has_nonempty_preset:
         print("build_shopping_links: no suggestions and no preset_queries")

@@ -1,5 +1,3 @@
-from ultralytics import YOLO
-import cv2
 import os
 from .color import extract_color
 
@@ -13,17 +11,32 @@ if not os.path.exists(model_path):
         "Please place your trained model as backend/ml/best.pt."
     )
 
-# Load once globally
-model = YOLO(model_path)
-
-print("DEBUG MODEL NAMES ON LOAD:", model.names)
-
 CONF_THRESHOLD = 0.35
 MIN_COVERAGE_RATIO = 0.02
 COLOR_DEBUG = os.getenv("COLOR_DEBUG", "0") == "1"
 COLOR_DEBUG_DIR = os.path.join(CURRENT_DIR, "..", "uploads", "color_debug")
 
+# ultralytics/torch are heavy (several seconds + lots of RAM) to import. We load
+# them lazily so the API process boots fast on free-tier hosts (e.g. Render) —
+# this keeps login and data endpoints responsive even on a cold start. The model
+# is only loaded the first time an image is actually detected.
+_model = None
+
+
+def get_model():
+    """Load and cache the YOLO model on first use."""
+    global _model
+    if _model is None:
+        from ultralytics import YOLO
+        _model = YOLO(model_path)
+        print("DEBUG MODEL NAMES ON LOAD:", _model.names)
+    return _model
+
+
 def detect_clothes(image_path, target="auto"):
+    import cv2
+
+    model = get_model()
     # Read the image once into memory
     image = cv2.imread(image_path)
     if image is None:
