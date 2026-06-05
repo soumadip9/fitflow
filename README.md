@@ -1,3 +1,13 @@
+## 🌐 Live Demo
+
+**Try FitFlow:** [https://fitflow-beta-tan.vercel.app/](https://fitflow-beta-tan.vercel.app/)
+
+| | |
+|---|---|
+| **Email** | `ghoshsoumadip62@gmail.com` |
+| **Password** | `20262027` |
+
+> Use the credentials above to log in and explore the wardrobe, outfit builder, and AI stylist features.
 
 ---
 
