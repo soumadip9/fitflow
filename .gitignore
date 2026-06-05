@@ -32,8 +32,9 @@ ENV/
 backend/uploads/*
 !backend/uploads/.gitkeep
 
-# ML weights — copy locally or use Git LFS (do not commit large .pt files)
+# ML weights — large .pt files are ignored, except the model tracked via Git LFS
 backend/ml/*.pt
+!backend/ml/best.pt
 
 # Editor
 .vscode/*
