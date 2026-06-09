@@ -543,11 +543,14 @@ def _closest_match_outfit(
     gender: Optional[str],
 ) -> Tuple[Dict[str, Any], Dict[str, float]]:
     """
-    When strict occasion filters rule out every slot, pick best available piece per slot
-    (no class filter). Uses full grouped wardrobe.
+    Last resort when strict builders find nothing: pick best piece per slot from the
+    full wardrobe while still respecting occasion-forbidden classes (never t-shirt
+    for office, etc.).
     """
     del gender  # reserved for future shoe bias
-    forb: Set[str] = set()
+    from ml.occasion_rules import FORBIDDEN_ANY_YOLO
+
+    forb = set(FORBIDDEN_ANY_YOLO.get(occ, set()))
     outfit: Dict[str, Any] = {}
     scores: Dict[str, float] = {}
 
@@ -749,6 +752,8 @@ def _sorted_pool(
     allowed: Optional[Set[str]],
     forbidden: Set[str],
     limit: int,
+    *,
+    strict_allowed: bool = False,
 ) -> List[Dict[str, Any]]:
     if not candidates:
         return []
@@ -757,6 +762,8 @@ def _sorted_pool(
         filtered = [c for c in candidates if _item_class(c) in allowed]
         if filtered:
             pool = filtered
+        elif strict_allowed:
+            return []
     pool = [c for c in pool if _item_class(c) not in forbidden]
     ranked = sorted(
         pool,
@@ -845,9 +852,12 @@ def _rank_strict_outfit_combos(
             {"formal_shirt", "longsleeve", "blazer", "cardigan", "vest", "sweaters", "pullover", "top"},
             forb,
             bl,
+            strict_allowed=True,
         )
-        bottoms = _sorted_pool(grouped["bottom"], {"trousers"}, forb, bl)
-        shoes = _sorted_pool(grouped["shoes"], {"boot", "heel"}, forb, bl)
+        bottoms = _sorted_pool(
+            grouped["bottom"], {"trousers", "skirt"}, forb, bl, strict_allowed=True
+        )
+        shoes = _sorted_pool(grouped["shoes"], {"boot", "heel"}, forb, bl, strict_allowed=True)
         for t, b in product(tops, bottoms):
             # When the wardrobe has no office-appropriate footwear, still showcase
             # the proper top+bottom instead of bailing to an unfiltered casual fallback.
@@ -1015,9 +1025,10 @@ def _fill_missing_shoes(
     """
     if not isinstance(outfit, dict) or outfit.get("shoes"):
         return outfit
-    from ml.occasion_rules import HARD_CONSTRAINTS
-    hard_forb = set(HARD_CONSTRAINTS.get(occ, set()))
-    shoe = _pick_best(grouped_full.get("shoes", []), None, hard_forb)
+    from ml.occasion_rules import FORBIDDEN_ANY_YOLO
+
+    forb = set(FORBIDDEN_ANY_YOLO.get(occ, set()))
+    shoe = _pick_best(grouped_full.get("shoes", []), None, forb)
     if shoe:
         outfit["shoes"] = shoe
     return outfit
@@ -1083,7 +1094,7 @@ def build_outfit(
         return _check_min_score(strict_res)
 
     relaxed, relaxed_scores = _closest_match_outfit(grouped_full, occ, gender)
-    if relaxed:
+    if relaxed and any(relaxed.get(s) for s in ("top", "bottom", "shoes")):
         res = {
             "occasion": occ,
             "outfit": relaxed,

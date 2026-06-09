@@ -81,7 +81,7 @@ const HeartIcon = () => (
 );
 
 function OutfitBuilder() {
-    const { wardrobeItems, saveOutfit } = useWardrobe();
+    const { wardrobeItems, saveOutfit, loadingWardrobe } = useWardrobe();
     /**
      * Visual outfit state: image URL per slot (required) + full item for API/save.
      * Shape per slot: { image: string, item: object } | null
@@ -151,11 +151,31 @@ function OutfitBuilder() {
 
     const findWardrobeMatch = (aiItem) => {
         if (!aiItem) return null;
+        const id = String(aiItem._id ?? aiItem.id ?? '');
+        if (id) {
+            const byId = availableItems.find(i => String(i.id) === id);
+            if (byId) return byId;
+        }
         const targetGroup = getBuilderCategory(aiItem.category);
         const matches = availableItems.filter(
             i => getBuilderCategoryFromItem(i) === targetGroup
         );
-        return matches.find(i => i.color === aiItem.color) || matches[0] || null;
+        const byColor = matches.find(i => i.color === aiItem.color);
+        if (byColor) return byColor;
+        if (matches[0]) return matches[0];
+        // Backend picked valid Mongo items — show them even if local wardrobe cache is stale.
+        if (aiItem.image || aiItem.display_name || aiItem.category) {
+            return {
+                id: id || `api-${aiItem.category}-${aiItem.color}`,
+                name: aiItem.display_name || aiItem.name || aiItem.category,
+                display_name: aiItem.display_name || aiItem.name || aiItem.category,
+                category: aiItem.category,
+                color: aiItem.color,
+                image: aiItem.image,
+                status: 'available',
+            };
+        }
+        return null;
     };
 
     const findAccessoryWardrobeMatch = (aiItem) => {
@@ -239,10 +259,14 @@ function OutfitBuilder() {
         setOutfitName('');
     };
 
-    const BUILD_OUTFIT_MS = 14000;
+    const BUILD_OUTFIT_MS = 45000;
     const RATE_OUTFIT_MS = 60000;
 
     const handleGenerateSuggestion = async () => {
+        if (loadingWardrobe) {
+            setFeedbackError('Wardrobe is still loading — please wait a moment and try again.');
+            return;
+        }
         setIsGenerating(true);
         setFeedback(null);
         setFeedbackError('');
@@ -328,34 +352,11 @@ function OutfitBuilder() {
             const aborted = err?.name === 'AbortError';
             setFeedbackError(
                 aborted
-                    ? 'Suggestion timed out — showing a random pick from your wardrobe.'
-                    : 'Could not generate outfit. Showing random suggestion.'
+                    ? 'Suggestion timed out — the backend may be waking up. Wait 30 seconds and try again.'
+                    : 'Could not generate outfit. Check that the backend is running and try again.'
             );
         }
 
-        const pickRandom = (group) => {
-            const catItems = availableItems.filter(i => getBuilderCategoryFromItem(i) === group);
-            return catItems.length > 0 ? catItems[Math.floor(Math.random() * catItems.length)] : null;
-        };
-        const topR = pickRandom('Upperwear');
-        const bottomR = pickRandom('Lowerwear');
-        const shoesR = pickRandom('Shoes');
-        await handleRateOutfitFromLayers({
-            top: topR,
-            bottom: bottomR,
-            shoes: shoesR,
-        });
-        setAiPicks({
-            top: topR,
-            bottom: bottomR,
-            shoes: shoesR,
-            accessory: null,
-        });
-        setLayers({
-            top: topR ? { image: topR.image, item: { ...topR } } : null,
-            bottom: bottomR ? { image: bottomR.image, item: { ...bottomR } } : null,
-            shoes: shoesR ? { image: shoesR.image, item: { ...shoesR } } : null,
-        });
         setIsGenerating(false);
     };
 
@@ -438,7 +439,10 @@ function OutfitBuilder() {
         const bottomMatch = findWardrobeMatch(o.bottom);
         const shoesMatch = findWardrobeMatch(o.shoes);
         const accessoryMatch = findAccessoryWardrobeMatch(o.accessory);
-        if (!topMatch && !bottomMatch && !shoesMatch) return;
+        if (!topMatch && !bottomMatch && !shoesMatch) {
+            setBuildNotice('Could not display this match — try “Suggest outfit” again.');
+            return;
+        }
         setAiPicks({ top: null, bottom: null, shoes: null, accessory: null });
         setLayers({ top: null, bottom: null });
         await handleRateOutfitFromLayers({
