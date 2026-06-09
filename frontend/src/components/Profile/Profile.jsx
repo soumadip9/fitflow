@@ -3,9 +3,8 @@ import { styleOptions, colorOptions } from '../../data/mockData';
 import { useAuth } from '../../context/AuthContext';
 import { useWardrobe } from '../../context/WardrobeContext';
 import axios from 'axios';
+import { API_BASE } from '../../config';
 import './Profile.css';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 function Profile() {
     const { user, updateUserName, updateUserAvatar } = useAuth();
@@ -30,7 +29,7 @@ function Profile() {
             const token = localStorage.getItem('token');
             if (!token) return;
             try {
-                const response = await axios.get(`${API_URL}/profile`, {
+                const response = await axios.get(`${API_BASE}/profile`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const parsed = response.data;
@@ -89,7 +88,7 @@ function Profile() {
         const token = localStorage.getItem('token');
         if (!token) return;
         try {
-            await axios.put(`${API_URL}/profile`, {
+            await axios.put(`${API_BASE}/profile`, {
                 gender: profile.gender || null,
                 age: profile.age ? parseInt(profile.age, 10) : null,
                 fashion_styles: profile.styles,
